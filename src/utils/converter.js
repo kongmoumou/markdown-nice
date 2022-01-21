@@ -1,4 +1,4 @@
-import juice from "juice";
+import juice from "juice/index";
 import {message} from "antd";
 import {
   BASIC_THEME_ID,
@@ -130,6 +130,90 @@ export const solveHtml = () => {
   }
 
   return res;
+};
+
+export const solveHtmlInlineResource = async () => {
+  const element = document.getElementById(BOX_ID);
+
+  const inner = element.children[0].children;
+  for (const item of inner) {
+    item.setAttribute("data-tool", "mdnice编辑器");
+  }
+  let html = element.innerHTML;
+  html = html.replace(/<mjx-container (class="inline.+?)<\/mjx-container>/g, "<span $1</span>");
+  html = html.replace(/\s<span class="inline/g, '&nbsp;<span class="inline');
+  html = html.replace(/svg><\/span>\s/g, "svg></span>&nbsp;");
+  html = html.replace(/mjx-container/g, "section");
+  html = html.replace(/class="mjx-solid"/g, 'fill="none" stroke-width="70"');
+  html = html.replace(/<mjx-assistive-mml.+?<\/mjx-assistive-mml>/g, "");
+  const basicStyle = document.getElementById(BASIC_THEME_ID).innerText;
+  const markdownStyle = document.getElementById(MARKDOWN_THEME_ID).innerText;
+  const codeStyle = document.getElementById(CODE_THEME_ID).innerText;
+  const fontStyle = document.getElementById(FONT_THEME_ID).innerText;
+  let res = "";
+  let resPromise;
+  try {
+    res = juice.inlineContent(html, basicStyle + markdownStyle + codeStyle + fontStyle, {
+      inlinePseudoElements: true,
+      preserveImportant: true,
+    });
+
+    resPromise = new Promise((resolve, reject) => {
+      juice.juiceResources(
+        res,
+        {
+          webResources: {
+            images: true,
+            strict: true,
+            requestResource(requestOptions, callback) {
+              var fetchOptions = {
+                method: "GET",
+                compress: requestOptions.gzip,
+              };
+              fetch(requestOptions.uri, fetchOptions)
+                .then(function(response) {
+                  if (response.status !== 200) {
+                    throw new Error(requestOptions.uri + " returned http " + response.status);
+                  }
+
+                  if (requestOptions.encoding === "binary") {
+                    return response.blob().then(async function resp(body) {
+                      const reader = new FileReader();
+                      await new Promise((resolveReader, rejectReader) => {
+                        reader.onload = resolveReader;
+                        reader.onerror = rejectReader;
+                        reader.readAsDataURL(body);
+                      });
+                      return reader.result;
+                    });
+                  } else {
+                    return response.text();
+                  }
+                })
+                .then(
+                  function(body) {
+                    callback(null, body);
+                  },
+                  function(err) {
+                    callback(err);
+                  },
+                );
+            },
+          },
+        },
+        (e, h) => {
+          e && reject(e);
+          resolve(h);
+          // console.error(e);
+          // console.log(h);
+        },
+      );
+    });
+  } catch (e) {
+    message.error("请检查 CSS 文件是否编写正确！");
+  }
+
+  return resPromise;
 };
 
 export const copySafari = (text) => {
