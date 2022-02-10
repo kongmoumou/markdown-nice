@@ -426,7 +426,7 @@ export const githubUpload = ({
     const dir = date.getFullYear() + seperator + (date.getMonth() + 1) + seperator + date.getDate();
 
     const dateFilename = new Date().getTime() + "-" + file.name;
-    const url = `https://api.github.com/repos/${config.username}/${config.repo}/contents/${dir}/${dateFilename}?access_token=${config.token}`;
+    const url = `https://api.github.com/repos/${config.username}/${config.repo}/contents/${dir}/${dateFilename}`;
 
     const data = {
       content: base64,
@@ -436,7 +436,10 @@ export const githubUpload = ({
     axios
       .put(url, data, {
         withCredentials,
-        headers,
+        headers: {
+          ...headers,
+          Authorization: `token ${config.token}`,
+        },
         onUploadProgress: ({total, loaded}) => {
           onProgress(
             {
